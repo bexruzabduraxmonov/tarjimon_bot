@@ -5,19 +5,19 @@ Write-Host "=== Tarjimon bot — GitHub ga yuklash ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "1-qadam: GitHub da repozitoriy yarating (agar yo'q bo'lsa):" -ForegroundColor Yellow
 Write-Host "   https://github.com/new" -ForegroundColor White
-Write-Host "   - Repository name: tarjimon.bot" -ForegroundColor Gray
+Write-Host "   - Repository name: tarjimon_bot" -ForegroundColor Gray
 Write-Host "   - Public tanlang" -ForegroundColor Gray
 Write-Host "   - README, .gitignore qo'shmang (bo'sh repo)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "2-qadam: GitHub ga kiring va push qiling..." -ForegroundColor Yellow
 
-git remote set-url origin https://github.com/bexruzabduraxmonov/tarjimon.bot.git
+git remote set-url origin https://github.com/bexruzabduraxmonov/tarjimon_bot.git
 git push -u origin main
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "Muvaffaqiyat! Kod GitHub ga yuklandi." -ForegroundColor Green
-    Write-Host "Repozitoriy: https://github.com/bexruzabduraxmonov/tarjimon.bot" -ForegroundColor Green
+    Write-Host "Repozitoriy: https://github.com/bexruzabduraxmonov/tarjimon_bot" -ForegroundColor Green
     Write-Host ""
     Write-Host "3-qadam: Bot 24/7 ishlashi uchun Render.com ga ulang:" -ForegroundColor Yellow
     Write-Host "   1. https://render.com ga kiring (GitHub bilan login)" -ForegroundColor White
