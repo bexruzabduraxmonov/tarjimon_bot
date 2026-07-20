@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { isLikelyQuestion, getQuestionReply } = require('../questionResponder');
 const { normalizeLanguageCode, shouldSkipTranslation, detectLanguageHint } = require('../translationService');
+const { getEffectiveTargetLanguage } = require('../languagePreferences');
 
 test('detects conversational questions more reliably', () => {
   assert.equal(isLikelyQuestion('Bot nima qila oladi?'), true);
@@ -24,4 +25,9 @@ test('avoids useless translation for same-language input', () => {
   assert.equal(shouldSkipTranslation('Salom', 'uz', 'uz'), true);
   assert.equal(shouldSkipTranslation('Hello', 'en', 'en'), true);
   assert.equal(shouldSkipTranslation('Hello', 'en', 'uz'), false);
+});
+
+test('uses English as the default target language for new chats', () => {
+  const preferences = new Map();
+  assert.equal(getEffectiveTargetLanguage(12345, preferences), 'en');
 });

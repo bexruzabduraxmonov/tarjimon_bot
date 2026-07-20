@@ -6,6 +6,7 @@ const os = require('os');
 const https = require('https');
 const { isLikelyQuestion, getQuestionReply } = require('./questionResponder');
 const { normalizeLanguageCode, shouldSkipTranslation, detectLanguageHint } = require('./translationService');
+const { getEffectiveTargetLanguage } = require('./languagePreferences');
 
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
   const credPath = path.join(os.tmpdir(), 'google-credentials.json');
@@ -494,7 +495,7 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  const targetLang = normalizeLanguageCode(userTargetLanguages.get(chatId) || 'en');
+  const targetLang = normalizeLanguageCode(getEffectiveTargetLanguage(chatId, userTargetLanguages));
   let sourceLang = normalizeLanguageCode(userSourceLanguages.get(chatId) || 'auto');
 
   if (!sourceLang || sourceLang === 'auto' || !['auto', 'en', 'ru', 'uz', 'tr', 'ar', 'zh-cn', 'ja', 'ko', 'hi', 'de', 'es', 'fr', 'it', 'pt', 'pl', 'uk', 'cs', 'sv', 'ro', 'el', 'hu', 'fa', 'id', 'ms', 'th', 'vi', 'bn', 'az', 'kk', 'ky', 'tg'].includes(sourceLang)) {
@@ -502,12 +503,7 @@ bot.on('message', async (msg) => {
   }
 
   if (!userTargetLanguages.has(chatId)) {
-    pendingLanguage.set(chatId, 'target');
-    await bot.sendMessage(chatId, '🎯 <b>Avval maqsad tilini tanlang:</b>\nQuyidagi tugmalar orqali maqsad tilni sozlang, keyin xabar yuboring.', {
-      parse_mode: 'HTML',
-      reply_markup: buildKeyboard('target', targetLang)
-    });
-    return;
+    userTargetLanguages.set(chatId, 'en');
   }
 
   if (isLikelyQuestion(msg.text)) {
