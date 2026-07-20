@@ -12,8 +12,11 @@ function normalizeLanguageCode(lang) {
     'english': 'en',
     'inglizcha': 'en',
     'turk': 'tr',
+    'turkcha': 'tr',
     'arab': 'ar',
+    'arabcha': 'ar',
     'xitoy': 'zh-cn',
+    'xitoycha': 'zh-cn',
     'yapon': 'ja',
     'koreys': 'ko',
     'hind': 'hi',
@@ -44,10 +47,21 @@ function normalizeLanguageCode(lang) {
     'kazakh': 'kk',
     'tajik': 'tg',
     'turkish': 'tr',
-    'turkcha': 'tr'
+    'russian': 'ru',
+    'uzbekistan': 'uz',
+    'english': 'en',
+    'french': 'fr',
+    'german': 'de',
+    'spanish': 'es',
+    'italian': 'it',
+    'japanese': 'ja',
+    'korean': 'ko',
+    'chinese': 'zh-cn',
+    'arabic': 'ar'
   };
 
-  return map[normalized] || normalized;
+  const code = map[normalized] || normalized;
+  return ['auto', 'en', 'ru', 'uz', 'tr', 'ar', 'zh-cn', 'ja', 'ko', 'hi', 'de', 'es', 'fr', 'it', 'pt', 'pl', 'uk', 'cs', 'sv', 'ro', 'el', 'hu', 'fa', 'id', 'ms', 'th', 'vi', 'bn', 'az', 'kk', 'ky', 'tg'].includes(code) ? code : 'auto';
 }
 
 function shouldSkipTranslation(text, sourceLang, targetLang) {

@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const translate = require('translate-google');
+const https = require('https');
 const { isLikelyQuestion, getQuestionReply } = require('./questionResponder');
 const { normalizeLanguageCode, shouldSkipTranslation, detectLanguageHint } = require('./translationService');
 
@@ -18,8 +18,30 @@ async function translateText(text, targetLang, sourceLang = 'auto') {
     throw new Error('Bo\'sh matn tarjima qilinmaydi.');
   }
 
-  const result = await translate(text, { to: targetLang, from: sourceLang });
-  return typeof result === 'string' ? result : result.text || String(result);
+  const from = sourceLang && sourceLang !== 'auto' ? sourceLang : 'auto';
+  const to = targetLang || 'uz';
+  const query = encodeURIComponent(text);
+  const url = `https://translate.google.uz/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${query}`;
+
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          const translated = parsed?.[0]?.[0]?.[0];
+          if (translated) {
+            resolve(translated);
+          } else {
+            reject(new Error('Tarjima javobi olinmadi.'));
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }).on('error', reject);
+  });
 }
 
 const token = process.env.BOT_TOKEN;
@@ -474,6 +496,10 @@ bot.on('message', async (msg) => {
 
   const targetLang = normalizeLanguageCode(userTargetLanguages.get(chatId) || 'en');
   let sourceLang = normalizeLanguageCode(userSourceLanguages.get(chatId) || 'auto');
+
+  if (!sourceLang || sourceLang === 'auto' || !['auto', 'en', 'ru', 'uz', 'tr', 'ar', 'zh-cn', 'ja', 'ko', 'hi', 'de', 'es', 'fr', 'it', 'pt', 'pl', 'uk', 'cs', 'sv', 'ro', 'el', 'hu', 'fa', 'id', 'ms', 'th', 'vi', 'bn', 'az', 'kk', 'ky', 'tg'].includes(sourceLang)) {
+    sourceLang = 'auto';
+  }
 
   if (!userTargetLanguages.has(chatId)) {
     pendingLanguage.set(chatId, 'target');
