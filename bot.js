@@ -7,6 +7,12 @@ const os = require('os');
 const translate = require('translate-google');
 const { SpeechClient } = require('@google-cloud/speech');
 
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  const credPath = path.join(os.tmpdir(), 'google-credentials.json');
+  fs.writeFileSync(credPath, process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = credPath;
+}
+
 async function translateText(text, targetLang, sourceLang = 'auto') {
   if (!text || !text.trim()) {
     throw new Error('Bo\'sh matn tarjima qilinmaydi.');
@@ -24,7 +30,19 @@ if (!token) {
 
 const pidFile = path.join(os.tmpdir(), 'tarjimon-bot.pid');
 
+function isCloudEnvironment() {
+  return Boolean(
+    process.env.RENDER ||
+    process.env.RAILWAY_ENVIRONMENT ||
+    process.env.FLY_APP_NAME ||
+    process.env.HEROKU_APP_NAME
+  );
+}
+
 function ensureSingleInstance() {
+  if (isCloudEnvironment()) {
+    return;
+  }
   if (fs.existsSync(pidFile)) {
     const existingPid = fs.readFileSync(pidFile, 'utf8').trim();
     if (existingPid) {
@@ -537,7 +555,13 @@ async function handleVoiceMessage(msg) {
       parse_mode: 'HTML'
     }).catch(() => {});
 
-    await saveAudio(mp3Path, translatedText, targetLang);
+    let hasAudio = false;
+    try {
+      await saveAudio(mp3Path, translatedText, targetLang);
+      hasAudio = true;
+    } catch (e) {
+      console.log(`[TTS] Audio yaratib bo'lmadi tili uchun: ${targetLang}`);
+    }
 
     // Delete the status message since we are sending the actual result now
     await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
@@ -554,7 +578,11 @@ async function handleVoiceMessage(msg) {
     ].join('\n');
 
     await bot.sendMessage(chatId, voiceResponse, { parse_mode: 'HTML' });
-    await bot.sendAudio(chatId, mp3Path);
+    if (hasAudio) {
+      await bot.sendAudio(chatId, mp3Path);
+    } else {
+      await bot.sendMessage(chatId, '⚠️ <i>Ushbu til uchun ovozli o\'qish qo\'llab-quvvatlanmaydi.</i>', { parse_mode: 'HTML' });
+    }
   } catch (error) {
     console.error('Voice message handling error:', error.message);
     if (statusMsg) {

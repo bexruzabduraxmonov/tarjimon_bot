@@ -1,70 +1,78 @@
-# Getting Started with Create React App
+# Tarjimon Telegram Bot
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Telegram tarjimon bot — matn va ovozli xabarlarni 30+ tilga tarjima qiladi.
 
-## Available Scripts
+**Bot:** [@Tarjimon00_bot](https://t.me/Tarjimon00_bot)
 
-In the project directory, you can run:
+## Imkoniyatlar
 
-### `npm start`
+- Matn tarjimasi (30+ til)
+- Ovozli xabar qabul qilish va tarjima qilish
+- Til tanlash (`/lang`, `/start`)
+- `/ping` — bot ishlayotganini tekshirish
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Lokal ishga tushirish
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```bash
+npm install
+cp .env.example .env
+# .env fayliga BOT_TOKEN qo'shing
+npm run bot
+```
 
-### `npm test`
+## GitHub + avtomatik ishga tushirish (Render)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Bot doimiy ishlashi uchun [Render.com](https://render.com) (bepul worker) ishlatiladi. GitHub'ga push qilganingizda avtomatik deploy bo'ladi.
 
-### `npm run build`
+### 1. GitHub'ga yuklash
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+git init
+git add .
+git commit -m "Tarjimon bot — GitHub va Render deploy"
+git branch -M main
+git remote add origin https://github.com/SIZNING_USERNAME/tarjimon.bot.git
+git push -u origin main
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+> `.env` fayli GitHub'ga yuklanmaydi — token xavfsiz qoladi.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### 2. Render'da ulash
 
-### `npm run eject`
+1. [render.com](https://render.com) ga kiring va GitHub bilan ro'yxatdan o'ting
+2. **New +** → **Blueprint**
+3. `tarjimon.bot` repozitoriyingizni tanlang
+4. `render.yaml` avtomatik topiladi — **Apply** bosing
+5. **Environment** bo'limida `BOT_TOKEN` ni kiriting (Telegram @BotFather token)
+6. Deploy tugagach bot 24/7 ishlaydi
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### 3. Yangilanishlar
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+GitHub'ga yangi commit push qilsangiz, Render avtomatik qayta deploy qiladi:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```bash
+git add .
+git commit -m "Yangilanish"
+git push
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Environment o'zgaruvchilari
 
-## Learn More
+| O'zgaruvchi | Majburiy | Tavsif |
+|---|---|---|
+| `BOT_TOKEN` | Ha | Telegram bot tokeni |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Yo'q | Ovozni matnga aylantirish uchun Google Cloud kaliti |
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Buyruqlar
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+| Buyruq | Vazifa |
+|---|---|
+| `/start` | Boshlash va til tanlash |
+| `/lang` | Maqsad tilini o'zgartirish |
+| `/ping` | Bot ishlayotganini tekshirish |
+| `/help` | Yordam |
 
-### Code Splitting
+## Muammolar
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- **409 Conflict** — bot bir vaqtning o'zida ikkita joyda ishlayapti. Lokal `npm run bot` ni to'xtating yoki Render'da faqat bitta instance qoldiring.
+- **Ovozli xabar ishlamayapti** — Google Cloud Speech kaliti kerak; aks holda faqat matn tarjimasi ishlaydi.
