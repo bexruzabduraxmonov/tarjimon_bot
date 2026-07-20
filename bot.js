@@ -1,11 +1,11 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const translate = require('translate-google');
-const { SpeechClient } = require('@google-cloud/speech');
+const { isLikelyQuestion, getQuestionReply } = require('./questionResponder');
+const { normalizeLanguageCode, shouldSkipTranslation, detectLanguageHint } = require('./translationService');
 
 if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
   const credPath = path.join(os.tmpdir(), 'google-credentials.json');
@@ -77,6 +77,14 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function splitIntoChunks(text, size) {
+  const chunks = [];
+  for (let index = 0; index < text.length; index += size) {
+    chunks.push(text.slice(index, index + size));
+  }
+  return chunks;
 }
 
 ensureSingleInstance();
@@ -460,17 +468,13 @@ bot.on('callback_query', async (callbackQuery) => {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-  if (msg.voice) {
-    await handleVoiceMessage(msg);
-    return;
-  }
-
   if (!msg.text || msg.text.startsWith('/')) {
     return;
   }
 
-  const targetLang = userTargetLanguages.get(chatId) || 'en';
-  const sourceLang = userSourceLanguages.get(chatId) || 'auto';
+  const targetLang = normalizeLanguageCode(userTargetLanguages.get(chatId) || 'en');
+  let sourceLang = normalizeLanguageCode(userSourceLanguages.get(chatId) || 'auto');
+
   if (!userTargetLanguages.has(chatId)) {
     pendingLanguage.set(chatId, 'target');
     await bot.sendMessage(chatId, '🎯 <b>Avval maqsad tilini tanlang:</b>\nQuyidagi tugmalar orqali maqsad tilni sozlang, keyin xabar yuboring.', {
@@ -480,11 +484,34 @@ bot.on('message', async (msg) => {
     return;
   }
 
+  if (isLikelyQuestion(msg.text)) {
+    await bot.sendMessage(chatId, getQuestionReply(msg.text), { parse_mode: 'HTML' });
+    return;
+  }
+
+  const hintedLang = detectLanguageHint(msg.text);
+  if (hintedLang && sourceLang === 'auto') {
+    sourceLang = hintedLang;
+  }
+
   try {
     // Show typing state
     bot.sendChatAction(chatId, 'typing').catch(() => {});
 
-    const translatedText = await translateText(msg.text, targetLang, sourceLang);
+    if (shouldSkipTranslation(msg.text, sourceLang, targetLang)) {
+      await bot.sendMessage(chatId, 'ℹ️ <b>Tarjima qilinishi shart emas.</b> Bu xabar allaqachon tanlangan tilga mos keladi.', { parse_mode: 'HTML' });
+      return;
+    }
+
+    const normalizedText = String(msg.text).trim();
+    const chunks = normalizedText.length > 300 ? splitIntoChunks(normalizedText, 300) : [normalizedText];
+    const translatedChunks = [];
+
+    for (const chunk of chunks) {
+      translatedChunks.push(await translateText(chunk, targetLang, sourceLang));
+    }
+
+    const translatedText = translatedChunks.join('\n');
     const sourceLabel = getLanguageName(sourceLang);
     const targetLabel = getLanguageName(targetLang);
     
@@ -501,139 +528,6 @@ bot.on('message', async (msg) => {
     await bot.sendMessage(chatId, '❌ <b>Tarjima qilishda muammo yuz berdi.</b>\nIltimos, qaytadan urinib ko\'ring.', { parse_mode: 'HTML' });
   }
 });
-
-async function handleVoiceMessage(msg) {
-  const chatId = msg.chat.id;
-  const targetLang = userTargetLanguages.get(chatId) || 'en';
-  const sourceLang = userSourceLanguages.get(chatId) || 'auto';
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-bot-'));
-  const oggPath = path.join(tempDir, 'voice.ogg');
-  const wavPath = path.join(tempDir, 'voice.wav');
-  const mp3Path = path.join(tempDir, 'voice.mp3');
-
-  let statusMsg;
-  try {
-    statusMsg = await bot.sendMessage(chatId, '⏳ <b>Ovozli xabar yuklab olinmoqda...</b>', { parse_mode: 'HTML' });
-
-    const fileLink = await bot.getFileLink(msg.voice.file_id);
-    const audioResponse = await axios({ url: fileLink, responseType: 'stream' });
-    const writer = fs.createWriteStream(oggPath);
-    audioResponse.data.pipe(writer);
-
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
-    });
-
-    await bot.editMessageText('⚙️ <b>Ovoz matnga o\'girilmoqda...</b>', {
-      chat_id: chatId,
-      message_id: statusMsg.message_id,
-      parse_mode: 'HTML'
-    }).catch(() => {});
-
-    const result = await transcribeAudio(oggPath);
-    if (!result || !result.trim()) {
-      await bot.editMessageText('❌ <b>Ovozni aniqlab bo\'lmadi.</b> Iltimos, aniqroq gapiring.', {
-        chat_id: chatId,
-        message_id: statusMsg.message_id,
-        parse_mode: 'HTML'
-      });
-      return;
-    }
-
-    await bot.editMessageText('✍️ <b>Matn tarjima qilinmoqda...</b>', {
-      chat_id: chatId,
-      message_id: statusMsg.message_id,
-      parse_mode: 'HTML'
-    }).catch(() => {});
-
-    const translatedText = await translateText(result, targetLang, sourceLang);
-
-    await bot.editMessageText('🔊 <b>Tarjima ovozli xabarga o\'tkazilmoqda...</b>', {
-      chat_id: chatId,
-      message_id: statusMsg.message_id,
-      parse_mode: 'HTML'
-    }).catch(() => {});
-
-    let hasAudio = false;
-    try {
-      await saveAudio(mp3Path, translatedText, targetLang);
-      hasAudio = true;
-    } catch (e) {
-      console.log(`[TTS] Audio yaratib bo'lmadi tili uchun: ${targetLang}`);
-    }
-
-    // Delete the status message since we are sending the actual result now
-    await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    statusMsg = null;
-
-    const sourceLabel = getLanguageName(sourceLang);
-    const targetLabel = getLanguageName(targetLang);
-
-    const voiceResponse = [
-      `<b>🗣️ Ovozli xabar tarjimasi:</b>`,
-      `<blockquote>${escapeHtml(translatedText)}</blockquote>`,
-      ``,
-      `<i>🌐 ${languageFlags[sourceLang] || '🔎'} ${sourceLabel} ➡️ ${languageFlags[targetLang] || '🌐'} ${targetLabel}</i>`
-    ].join('\n');
-
-    await bot.sendMessage(chatId, voiceResponse, { parse_mode: 'HTML' });
-    if (hasAudio) {
-      await bot.sendAudio(chatId, mp3Path);
-    } else {
-      await bot.sendMessage(chatId, '⚠️ <i>Ushbu til uchun ovozli o\'qish qo\'llab-quvvatlanmaydi.</i>', { parse_mode: 'HTML' });
-    }
-  } catch (error) {
-    console.error('Voice message handling error:', error.message);
-    if (statusMsg) {
-      await bot.deleteMessage(chatId, statusMsg.message_id).catch(() => {});
-    }
-    await bot.sendMessage(chatId, '❌ <b>Ovozli xabarni hozircha qayta ishlay olmayapman.</b> Iltimos, matn yuboring.', { parse_mode: 'HTML' });
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
-}
-
-async function transcribeAudio(filePath) {
-  try {
-    const client = new SpeechClient();
-    const audioBytes = fs.readFileSync(filePath);
-    const audio = {
-      content: audioBytes.toString('base64'),
-    };
-    const config = {
-      encoding: 'LINEAR16',
-      sampleRateHertz: 16000,
-      languageCode: 'en-US',
-    };
-    const request = {
-      audio,
-      config,
-    };
-
-    const [response] = await client.recognize(request);
-    const transcription = response.results
-      ?.map((result) => result.alternatives?.[0]?.transcript || '')
-      .filter(Boolean)
-      .join(' ');
-
-    return transcription || '';
-  } catch (error) {
-    throw new Error('Voice transcription is not available in this environment.');
-  }
-}
-
-async function saveAudio(filePath, text, lang) {
-  const gTTS = require('gtts');
-  const audioBuffer = await new Promise((resolve, reject) => {
-    const gtts = new gTTS(text, lang);
-    gtts.save(filePath, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-  return audioBuffer;
-}
 
 console.log('Bot started and listening for updates.');
 
