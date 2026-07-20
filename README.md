@@ -31,7 +31,7 @@ git init
 git add .
 git commit -m "Tarjimon bot — GitHub va Render deploy"
 git branch -M main
-git remote add origin https://github.com/SIZNING_USERNAME/tarjimon.bot.git
+git remote add origin https://github.com/bexruzabduraxmonov/tarjimon.bot.git
 git push -u origin main
 ```
 
